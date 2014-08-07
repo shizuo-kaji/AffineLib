@@ -7,18 +7,20 @@
 
 var indexSectionsWithContent =
 {
-  0: "aeflmp",
-  1: "m",
+  0: "abeflpt",
+  1: "a",
   2: "a",
-  3: "aeflp"
+  3: "beflpt",
+  4: "ep"
 };
 
 var indexSectionNames =
 {
   0: "all",
-  1: "classes",
+  1: "namespaces",
   2: "files",
-  3: "functions"
+  3: "functions",
+  4: "defines"
 };
 
 function convertToId(search)

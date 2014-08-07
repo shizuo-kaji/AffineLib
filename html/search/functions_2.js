@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['frechetse',['frechetSE',['../class_matrixlib.html#aa6382865ac5a77d1532160421ef7d198',1,'Matrixlib']]],
-  ['frechetso',['frechetSO',['../class_matrixlib.html#a8e3576adbd03f452036b11195fcb75f3',1,'Matrixlib']]]
+  ['frechetse',['frechetSE',['../namespace_affine_lib.html#a1391ddf909735f80ae5df6c7bd541ba5',1,'AffineLib']]],
+  ['frechetso',['frechetSO',['../namespace_affine_lib.html#a996f27200b97e7d35b6dc533e00041ed',1,'AffineLib']]]
 ];
