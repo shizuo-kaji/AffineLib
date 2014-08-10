@@ -170,30 +170,6 @@ namespace AffineLib{
         }
     }
     
-    Matrix4d logSEc(const Matrix4d& mm, const Matrix4d& P)
-    /** "Continuous" log for rigid transformation (screw) matrix
-     * @param mm rigid transformation matrix
-     * @param P log matrix
-     * @return branch of log(m) closest to P
-     */
-    {
-        Matrix3d m = mm.block(0,0,3,3);
-        assert( ((m * m.transpose()) - E).squaredNorm() < EPSILON );
-        Vector3d v = transPart(mm);
-        Matrix3d X = logSOc(m, P.block(0,0,3,3));
-        double theta=sqrt(X(1,2)*X(1,2) + X(0,2)*X(0,2) + X(0,1)*X(0,1));
-        Matrix3d A;
-        if(abs(1-cos(theta))<EPSILON){
-            return(pad(X,transPart(P),0.0));
-        }else if(abs(1+cos(theta))<EPSILON){
-            A = E - 0.5 * X + 1.0/(theta*theta) * X*X;
-            return(pad(X, A.transpose()*v,0.0));
-        }else{
-            A = E - 0.5 * X + (1.0/(theta*theta) - 0.5*(1.0+cos(theta))/(sin(theta)*theta)) * X * X;
-            return(pad(X, A.transpose()*v,0.0));
-        }
-    }
-    
     Matrix4d expSE(const Matrix4d& mm)
     /** exp for rigid transformation (screw) matrix
      * @param mm rigid transformation matrix
@@ -214,6 +190,37 @@ namespace AffineLib{
             A = E + (1.0-cos(norm))/norm2 * m + (norm-sin(norm))/(norm*norm2) * m*m ;
             return pad(ans, A.transpose()*v);
         }
+    }
+    
+    Matrix4d logSEc(const Matrix4d& mm, const Matrix4d& P)
+    /** "Continuous" log for rigid transformation (screw) matrix
+     * @param mm rigid transformation matrix
+     * @param P log matrix
+     * @return branch of log(m) closest to P
+     */
+    {
+        Matrix3d m = mm.block(0,0,3,3);
+        assert( ((m * m.transpose()) - E).squaredNorm() < EPSILON );
+        Vector3d v = transPart(mm);
+        Matrix3d X = logSOc(m, P.block(0,0,3,3));
+        double theta=sqrt(X(1,2)*X(1,2) + X(0,2)*X(0,2) + X(0,1)*X(0,1));
+        Matrix3d A;
+        Vector3d l;
+        if(abs(1-cos(theta))<EPSILON){
+            double prevTheta = sqrt(P(1,2)*P(1,2) + P(0,2)*P(0,2) + P(0,1)*P(0,1));
+            if( prevTheta < EPSILON ){
+                l = Vector3d::Zero();
+            }else{
+                l = theta / prevTheta * transPart(P);
+            }
+        }else if(abs(1+cos(theta))<EPSILON){
+            A = E - 0.5 * X + 1.0/(theta*theta) * X*X;
+            l = A.transpose()*v;
+        }else{
+            A = E - 0.5 * X + (1.0/(theta*theta) - 0.5*(1.0+cos(theta))/(sin(theta)*theta)) * X * X;
+            l = A.transpose()*v;
+        }
+        return(pad(X, l,0.0));
     }
     
     
