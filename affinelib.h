@@ -122,20 +122,21 @@ namespace AffineLib{
         return X.angle() * A;
     }
 
-    Matrix3d logSOc(const Matrix3d& m, double& prevTheta, Vector3d& prevN)
+    Matrix3d logSOc(const Matrix3d& m, const Matrix3d& P)
     /** "Continuous" log for rotational matrix
      * @param m rotational matrix
-     * @param prevTheta rotational angle
-     * @param prevN rotational axis vector
-     * @return branch of log(m) with axis and angle closest to the given ones
+     * @param P anti-symmetric matrix
+     * @return branch of log(m) closest to P
      */
     {
         AngleAxisd X(m);
         Matrix3d A;
         double theta=X.angle();
         Vector3d n=X.axis();
-        if(abs(theta)<EPSILON){
-            n=prevN;
+        Vector3d prevN(-P(1,2),P(0,2),-P(0,1));
+        double prevTheta=prevN.norm();
+        if(abs(theta)<EPSILON && abs(prevTheta)>EPSILON){
+            n=prevN/prevTheta;
         }
         A << 0,     -n[2], n[1],
         n[2], 0,        -n[0],
@@ -150,8 +151,6 @@ namespace AffineLib{
         while(prevTheta-theta>M_PI){
             theta += 2*M_PI;
         }
-        prevTheta=theta;
-        prevN << -A(1,2), A(0,2), -A(0,1);
         return(theta*A);
     }
     
@@ -171,25 +170,28 @@ namespace AffineLib{
         }
     }
     
-    Matrix4d logSEc(const Matrix4d& mm, double& prevTheta, Vector3d& prevN)
+    Matrix4d logSEc(const Matrix4d& mm, const Matrix4d& P)
     /** "Continuous" log for rigid transformation (screw) matrix
      * @param mm rigid transformation matrix
-     * @param prevTheta rotational angle
-     * @param prevN rotational axis vector
-     * @return branch of log(m) with axis and angle closest to the given ones
+     * @param P log matrix
+     * @return branch of log(m) closest to P
      */
     {
         Matrix3d m = mm.block(0,0,3,3);
         assert( ((m * m.transpose()) - E).squaredNorm() < EPSILON );
-        Vector3d v(mm(3,0), mm(3,1), mm(3,2));
-        Matrix3d X = logSOc(m, prevTheta, prevN);
+        Vector3d v = transPart(mm);
+        Matrix3d X = logSOc(m, P.block(0,0,3,3));
+        double theta=sqrt(X(1,2)*X(1,2) + X(0,2)*X(0,2) + X(0,1)*X(0,1));
         Matrix3d A;
-        if(abs(sin(prevTheta))<EPSILON){
-            A = E;
+        if(abs(1-cos(theta))<EPSILON){
+            return(pad(X,transPart(P),0.0));
+        }else if(abs(1+cos(theta))<EPSILON){
+            A = E - 0.5 * X + 1.0/(theta*theta) * X*X;
+            return(pad(X, A.transpose()*v,0.0));
         }else{
-            A = E - 0.5 * X + (1.0/(prevTheta*prevTheta) - 0.5*(1.0+cos(prevTheta))/(sin(prevTheta)*prevTheta)) * X * X;
+            A = E - 0.5 * X + (1.0/(theta*theta) - 0.5*(1.0+cos(theta))/(sin(theta)*theta)) * X * X;
+            return(pad(X, A.transpose()*v,0.0));
         }
-        return(pad(X, A.transpose()*v,0.0));
     }
     
     Matrix4d expSE(const Matrix4d& mm)
@@ -205,12 +207,11 @@ namespace AffineLib{
         double norm2=m(0,1)*m(0,1) + m(0,2)*m(0,2) + m(1,2)*m(1,2);
         Matrix3d A,ans;
         if(norm2<EPSILON){
-            return pad(E + m + m*m/2.0,v);
+            return (Matrix4d::Identity() + mm + mm*mm/2.0);
         }else{
             double norm = sqrt(norm2);
             ans = E + sin(norm)/norm * m + (1.0-cos(norm))/norm2 * m*m;
             A = E + (1.0-cos(norm))/norm2 * m + (norm-sin(norm))/(norm*norm2) * m*m ;
-            //        A = sin(norm)/norm * E + (1.0-cos(norm))/norm2 * ans;
             return pad(ans, A.transpose()*v);
         }
     }
@@ -405,13 +406,11 @@ namespace AffineLib{
         assert(m.size() == w.size());
         if(m.empty()) return(Matrix4d::Identity());
         Matrix4d Z = m[0];
-        double theta = 0.0;
-        Vector3d prevN = Vector3d::Zero();
         for(int i=0;i<max_step;i++){
             Matrix4d W = Matrix4d::Zero();
             Matrix4d ZI = Z.inverse();
             for(int j=0;j<m.size();j++){
-                W += w[j] * logSEc(ZI * m[j], theta, prevN);
+                W += w[j] * logSEc(ZI * m[j], Matrix4d::Zero());
             }
             if(W.squaredNorm()<EPSILON) break;
             Z = Z * expSE(W);
