@@ -331,7 +331,7 @@ namespace AffineLib{
         }
         if(e == Vector3d::Zero()){
             // compute eigenvalues if not given
-            // eigenvalues are sorted in decreasing order.
+            // eigenvalues are sorted in increasing order.
             SelfAdjointEigenSolver<Matrix3d> eigensolver;
             eigensolver.computeDirect(m, EigenvaluesOnly);
             e = eigensolver.eigenvalues();
@@ -341,41 +341,14 @@ namespace AffineLib{
             return exp(e[1])*(E+A+0.5*A*A);
         }
         double x(e[0]-e[1]),y(e[2]-e[1]);
-        double t2ex = (exp(x)-1-x)/(x*x);
-        double t2ey = (exp(y)-1-y)/(y*y);
+        double t2ex = abs(x)>EPSILON ? (exp(x)-1-x)/(x*x) : 0.5+x/6;
+        double t2ey = abs(y)>EPSILON ? (exp(y)-1-y)/(y*y) : 0.5+y/6;
         
         double b = 1- x*y*(t2ex-t2ey)/(x-y);
         double c = (x*t2ex- y*t2ey)/(x-y);
         return exp(e[1])*( E + b*A + c*A*A );
     }
     
-    
-    Matrix3d logSym2(const Matrix3d& m, Vector3d& lambda)
-    /** log for positive symmetric matrix by spectral decomposition
-     * @param m symmetric matrix
-     * @param lambda returns eigen values for log(m)
-     * @return log(m)
-     */
-    {
-        assert( ((m - m.transpose())).squaredNorm() < EPSILON );
-        if ((m-E).squaredNorm() < EPSILON){
-            return m-E-0.5*(m-E)*(m-E);
-        }
-        // compute eigenvalues only
-        // eigenvalues are sorted in decreasing order.
-        SelfAdjointEigenSolver<Matrix3d> eigensolver;
-        eigensolver.computeDirect(m, EigenvaluesOnly);
-        Vector3d e;
-        e = eigensolver.eigenvalues();
-        assert(e[0] > 0 && e[1] > 0 && e[2] > 0);
-        Matrix3d A = m/e[1];
-        double x(e[0]/e[1]),y(e[2]/e[1]);
-        double t2lx = (log(x)-x+1)/(x-1);
-        double t2ly = (log(y)-y+1)/(y-1);
-        double a = -1 + (y*t2lx - x*t2ly)/(x-y);
-        double c = (t2lx - t2ly)/(x-y);
-        return (a+log(e[1]))*E - (a+c)*A + c*A*A;
-    }
     
     Matrix3d logSym(const Matrix3d& m, Vector3d& lambda)
     /** log for positive symmetric matrix by spectral decomposition
@@ -389,21 +362,23 @@ namespace AffineLib{
             return m-E-0.5*(m-E)*(m-E);
         }
         // compute eigenvalues only
-        // eigenvalues are sorted in decreasing order.
+        // eigenvalues are sorted in increasing order.
         SelfAdjointEigenSolver<Matrix3d> eigensolver;
         eigensolver.computeDirect(m, EigenvaluesOnly);
         Vector3d e;
         e = eigensolver.eigenvalues();
         assert(e[0] > 0 && e[1] > 0 && e[2] > 0);
-        Matrix3d A = m-e[1]*E;
-        double x(e[0]-e[1]),y(e[2]-e[1]);
-        double t2lx = (log(e[0]/e[1])-x/e[1])/(x*x);
-        double t2ly = (log(e[2]/e[1])-y/e[1])/(y*y);
-        double b = 1/e[1] - x*y*(t2lx-t2ly)/(x-y);
-        double c = (x*t2lx- y*t2ly)/(x-y);
-        return log(e[1])*E + b*A + c*A*A;
+        Matrix3d A = m/e[1];
+        if ((A-E).squaredNorm() < EPSILON){
+            return log(e[1])*E+ (A-E-0.5*(A-E)*(A-E));
+        }
+        double x(e[0]/e[1]),y(e[2]/e[1]);
+        double t2lx = abs(x-1)>EPSILON ? (log(x)-x+1)/(x-1) : -1;
+        double t2ly = abs(y-1)>EPSILON ? (log(y)-y+1)/(y-1) : -1;
+        double a = -1 + (y*t2lx - x*t2ly)/(x-y);
+        double c = (t2lx - t2ly)/(x-y);
+        return (a+log(e[1]))*E - (a+c)*A + c*A*A;
     }
-    
     
     Matrix3d logSym_spectral(const Matrix3d& m, Vector3d& lambda)
     /** (Obsolete) log for positive symmetric matrix by spectral decomposition
@@ -414,7 +389,7 @@ namespace AffineLib{
     {
         assert( ((m - m.transpose())).squaredNorm() < EPSILON );
         if ((m-E).squaredNorm() < EPSILON){
-            return m-E;
+            return m-E-0.5*(m-E)*(m-E);
         }
         // compute eigenvalues only
         // eigenvalues are sorted in decreasing order.
