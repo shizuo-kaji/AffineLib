@@ -17,8 +17,6 @@
 // uncomment if you use MKL
 // #define  EIGEN_USE_MKL_ALL
 
-#include <Eigen/Core>
-#include <Eigen/LU>
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 #include <Eigen/StdVector>
@@ -33,7 +31,7 @@
 /// threshold for being zero
 #define EPSILON 10e-6
 /// 3x3 identity matrix
-#define E Matrix3d::Identity()
+#define Id3 Matrix3d::Identity()
 /// print Eigen object
 #define PRINT_MAT(X) std::cout << #X << ":\n" << X << std::endl << std::endl
 
@@ -75,37 +73,6 @@ namespace AffineLib{
          * @return 3D translation vector
          */
         return Vector3d(m(3,0),m(3,1),m(3,2));
-    }
-    
-    Matrix3d logSO_rodrigues(const Matrix3d& m)
-    /** Log for rotational matrix using Rodrigues' formula
-     * @param m rotational matrix
-     * @return primary value of log(m)
-     */
-    {
-        assert( ((m * m.transpose()) - E).squaredNorm() < EPSILON );
-        double tr=(m(0,0)+m(1,1)+m(2,2)-1.0)/2.0;
-        double theta;
-        Matrix3d ans=Matrix3d::Zero();
-        if(tr>=1.0){
-            return ans;
-        }else if(tr<=-1.0){
-            ans(0,1)=M_PI;
-            ans(1,0)=-M_PI;
-            return ans;
-        }else{
-            theta=acos(tr);
-        }
-        if(theta<EPSILON){
-            return ans;
-        }else if(M_PI-theta<EPSILON){
-            ans(0,1)=M_PI;
-            ans(1,0)=-M_PI;
-            return ans;
-        }else{
-            ans=0.5*theta/sin(theta) * (m-m.transpose());
-            return ans;
-        }
     }
     
     Matrix3d logSO(const Matrix3d& m)
@@ -161,8 +128,8 @@ namespace AffineLib{
          * @return exp(m)
          */
     {
-        Matrix3d A = E;
-        Matrix3d mPow = E;
+        Matrix3d A = Id3;
+        Matrix3d mPow = Id3;
         for(int i=1;i<deg+1;i++){
             mPow = m*mPow/i;
             A += mPow;
@@ -178,9 +145,9 @@ namespace AffineLib{
      */
     {
         Matrix3d A = Matrix3d::Zero();
-        Matrix3d mPow = -E;
+        Matrix3d mPow = -Id3;
         for(int i=1;i<deg+1;i++){
-            mPow = (E-m)*mPow;
+            mPow = (Id3-m)*mPow;
             A += mPow/i;
         }
         return A;
@@ -196,10 +163,10 @@ namespace AffineLib{
 //        assert( ((m + m.transpose())).squaredNorm() < EPSILON );
         double norm2=m(0,1)*m(0,1) + m(0,2)*m(0,2) + m(1,2)*m(1,2);
         if(norm2<EPSILON){
-            return E + m + m*m/2.0;
+            return Id3 + m + m*m/2.0;
         }else{
             double norm = sqrt(norm2);
-            return E + sin(norm)/norm * m + (1.0-cos(norm))/norm2 * m*m;
+            return Id3 + sin(norm)/norm * m + (1.0-cos(norm))/norm2 * m*m;
         }
     }
     
@@ -219,8 +186,8 @@ namespace AffineLib{
             return (Matrix4d::Identity() + mm + mm*mm/2.0);
         }else{
             double norm = sqrt(norm2);
-            ans = E + sin(norm)/norm * m + (1.0-cos(norm))/norm2 * m*m;
-            A = E + (1.0-cos(norm))/norm2 * m + (norm-sin(norm))/(norm*norm2) * m*m ;
+            ans = Id3 + sin(norm)/norm * m + (1.0-cos(norm))/norm2 * m*m;
+            A = Id3 + (1.0-cos(norm))/norm2 * m + (norm-sin(norm))/(norm*norm2) * m*m ;
             return pad(ans, A.transpose()*v);
         }
     }
@@ -233,7 +200,7 @@ namespace AffineLib{
      */
     {
         Matrix3d m = mm.block(0,0,3,3);
-//        assert( ((m * m.transpose()) - E).squaredNorm() < EPSILON );
+//        assert( ((m * m.transpose()) - Id3).squaredNorm() < EPSILON );
         Vector3d v = transPart(mm);
         Matrix3d X = logSOc(m, P.block(0,0,3,3));
         double theta=sqrt(X(1,2)*X(1,2) + X(0,2)*X(0,2) + X(0,1)*X(0,1));
@@ -247,10 +214,10 @@ namespace AffineLib{
                 l = theta / prevTheta * transPart(P);
             }
         }else if(abs(1+cos(theta))<EPSILON){
-            A = E - 0.5 * X + 1.0/(theta*theta) * X*X;
+            A = Id3 - 0.5 * X + 1.0/(theta*theta) * X*X;
             l = A.transpose()*v;
         }else{
-            A = E - 0.5 * X + (1.0/(theta*theta) - 0.5*(1.0+cos(theta))/(sin(theta)*theta)) * X * X;
+            A = Id3 - 0.5 * X + (1.0/(theta*theta) - 0.5*(1.0+cos(theta))/(sin(theta)*theta)) * X * X;
             l = A.transpose()*v;
         }
         return(pad(X, l,0.0));
@@ -288,7 +255,7 @@ namespace AffineLib{
     {
         assert( ((m - m.transpose())).squaredNorm() < EPSILON );
         if (m.squaredNorm() < EPSILON){
-            return E+m;
+            return Id3+m;
         }
         SelfAdjointEigenSolver<Matrix3d> eigensolver;
 //        eigensolver.computeDirect(m);
@@ -299,15 +266,15 @@ namespace AffineLib{
         return(U * s.asDiagonal() * U.transpose());
     }
     
-    Matrix3d logSymD(const Matrix3d& m)
+    Matrix3d logSymDiag(const Matrix3d& m)
     /** log for symmetric matrix by diagonalization
      * @param m symmetric matrix
      * @return log(m)
      */
     {
         assert( ((m - m.transpose())).squaredNorm() < EPSILON );
-        if ((m-E).squaredNorm() < EPSILON){
-            return m-E;
+        if ((m-Id3).squaredNorm() < EPSILON){
+            return m-Id3;
         }
         SelfAdjointEigenSolver<Matrix3d> eigensolver;
 //        eigensolver.computeDirect(m);
@@ -327,7 +294,7 @@ namespace AffineLib{
     {
 //        assert( ((m - m.transpose())).squaredNorm() < EPSILON );
         if(m.squaredNorm() < EPSILON){
-            return E+m+0.5*m*m;
+            return Id3+m+0.5*m*m;
         }
         if(e == Vector3d::Zero()){
             // compute eigenvalues if not given
@@ -336,9 +303,9 @@ namespace AffineLib{
             eigensolver.computeDirect(m, EigenvaluesOnly);
             e = eigensolver.eigenvalues();
         }
-        Matrix3d A = m-e[1]*E;
+        Matrix3d A = m-e[1]*Id3;
         if (A.squaredNorm() < EPSILON){
-            return exp(e[1])*(E+A+0.5*A*A);
+            return exp(e[1])*(Id3+A+0.5*A*A);
         }
         double x(e[0]-e[1]),y(e[2]-e[1]);
         double t2ex = abs(x)>EPSILON ? (exp(x)-1-x)/(x*x) : 0.5+x/6;
@@ -346,7 +313,7 @@ namespace AffineLib{
         
         double b = 1- x*y*(t2ex-t2ey)/(x-y);
         double c = (x*t2ex- y*t2ey)/(x-y);
-        return exp(e[1])*( E + b*A + c*A*A );
+        return exp(e[1])*( Id3 + b*A + c*A*A );
     }
     
     
@@ -358,8 +325,8 @@ namespace AffineLib{
      */
     {
         assert( ((m - m.transpose())).squaredNorm() < EPSILON );
-        if ((m-E).squaredNorm() < EPSILON){
-            return m-E-0.5*(m-E)*(m-E);
+        if ((m-Id3).squaredNorm() < EPSILON){
+            return m-Id3-0.5*(m-Id3)*(m-Id3);
         }
         // compute eigenvalues only
         // eigenvalues are sorted in increasing order.
@@ -369,15 +336,15 @@ namespace AffineLib{
         e = eigensolver.eigenvalues();
         assert(e[0] > 0 && e[1] > 0 && e[2] > 0);
         Matrix3d A = m/e[1];
-        if ((A-E).squaredNorm() < EPSILON){
-            return log(e[1])*E+ (A-E-0.5*(A-E)*(A-E));
+        if ((A-Id3).squaredNorm() < EPSILON){
+            return log(e[1])*Id3 + (A-Id3-0.5*(A-Id3)*(A-Id3));
         }
         double x(e[0]/e[1]),y(e[2]/e[1]);
         double t2lx = abs(x-1)>EPSILON ? (log(x)-x+1)/(x-1) : -1;
         double t2ly = abs(y-1)>EPSILON ? (log(y)-y+1)/(y-1) : -1;
         double a = -1 + (y*t2lx - x*t2ly)/(x-y);
         double c = (t2lx - t2ly)/(x-y);
-        return (a+log(e[1]))*E - (a+c)*A + c*A*A;
+        return (a+log(e[1]))*Id3 - (a+c)*A + c*A*A;
     }
     
     Matrix3d logSym_spectral(const Matrix3d& m, Vector3d& lambda)
@@ -388,8 +355,8 @@ namespace AffineLib{
      */
     {
         assert( ((m - m.transpose())).squaredNorm() < EPSILON );
-        if ((m-E).squaredNorm() < EPSILON){
-            return m-E-0.5*(m-E)*(m-E);
+        if ((m-Id3).squaredNorm() < EPSILON){
+            return m-Id3-0.5*(m-Id3)*(m-Id3);
         }
         // compute eigenvalues only
         // eigenvalues are sorted in decreasing order.
@@ -406,17 +373,17 @@ namespace AffineLib{
         // when some eigenvalues coincide
         if(abs(e12)<EPSILON){
             if(abs(e23)<EPSILON){
-                return lambda(0) * E;
+                return lambda(0) * Id3;
             }else{
                 a= lambda(1) / e23;
                 b= lambda(2) / e23;
-                return (a-b)*m + (e[1]*b-e[2]*a)*E;
+                return (a-b)*m + (e[1]*b-e[2]*a)*Id3;
             }
         }else{
             if(abs(e23)<EPSILON){
                 a=lambda(0) / e12;
                 b=lambda(1) / e12;
-                return (a-b)*m + (e[0]*b-e[1]*a)*E;
+                return (a-b)*m + (e[0]*b-e[1]*a)*Id3;
             }
         }
         // when all eigenvalues are distinct
@@ -425,7 +392,7 @@ namespace AffineLib{
         c = lambda(2) / (e13*e23);
         return (a + b + c) * m * m
         - (a * (e[1] + e[2]) + b * (e[2] + e[0]) + c * (e[0] + e[1])) * m
-        + (a * e[1] * e[2] + b * e[2] * e[0] + c * e[0] * e[1]) * E;
+        + (a * e[1] * e[2] + b * e[2] * e[0] + c * e[0] * e[1]) * Id3;
     }
     
     
@@ -434,11 +401,11 @@ namespace AffineLib{
      * @param m array of rotation matrices to be averaged
      * @param w array of weights
      * @param max_step max steps for iteration
-     * @return weighted Frechet sum
+     * @return weighted Frechet mean
      */
     {
         assert(m.size() == w.size());
-        if(m.empty()) return(E);
+        if(m.empty()) return(Id3);
         Matrix3d Z = m[0];
         for(int i=0;i<max_step;i++){
             Matrix3d W = Matrix3d::Zero();
@@ -452,82 +419,6 @@ namespace AffineLib{
         return(Z);
     }
     
-    Matrix4d frechetSE(const std::vector<Matrix4d> &m, const std::vector<double> &w, const int max_step=10)
-    /** Frechet sum for rigid transformations
-     * @param m array of rigid transformation matrices to be averaged
-     * @param w array of weights
-     * @param max_step max steps for iteration
-     * @return weighted Frechet sum
-     */
-    {
-        assert(m.size() == w.size());
-        if(m.empty()) return(Matrix4d::Identity());
-        Matrix4d Z = m[0];
-        for(int i=0;i<max_step;i++){
-            Matrix4d W = Matrix4d::Zero();
-            Matrix4d ZI = Z.inverse();
-            for(int j=0;j<m.size();j++){
-                W += w[j] * logSEc(ZI * m[j], Matrix4d::Zero());
-            }
-            if(W.squaredNorm()<EPSILON) break;
-            Z = Z * expSE(W);
-        }
-        return(Z);
-    }
-    
-    Vector3d eigenvaluesSym(const Matrix3d &m)
-    /** (Obsolete) Eigenvalues for symmetric matrix using Viete's formula
-     * use Eigen's "SelfAdjointEigenSolver< MatrixType > & computeDirect" instead
-     * @param m symmetric matrix
-     * @return eigenvalues
-     */
-    {
-        assert( ((m - m.transpose())).squaredNorm() < EPSILON );
-        Vector3d w;
-        double s1,s2,s3;
-        // check if m is diagonal;
-        if (m(0,1)*m(0,1)+m(0,2)*m(0,2)+m(1,2)*m(1,2)<EPSILON){
-            s1 = m(0,0);
-            s2 = m(1,1);
-            s3 = m(2,2);
-        }else{
-            double a = - m.trace();
-            double aa = a*a;
-            double b = (aa - m.squaredNorm()) / 2;
-            
-            double p = aa / 3 - b;
-            double q = 2 * aa * a / 27 - a * b / 3 - m.determinant();
-            
-            // since p,q are close to 0, the next statement is numerically unstable.
-            if (p==0) {
-                s1 = s2 = s3 = -a/3;
-            }else {
-                double r = sqrt(4 * p / 3);
-                double k = - 4 * q / (r * r * r);
-                double theta;
-                if (k>1.0){
-                    theta = 0.0;
-                }else if(k<-1.0){
-                    theta = M_PI;
-                }else{
-                    theta = acos(k);
-                }
-                s1 = r*cos(theta / 3) - a / 3;
-                s2 = r*cos((theta +  2 * M_PI) / 3) - a / 3;
-                s3 = r*cos((theta + 4 * M_PI) / 3) - a / 3;
-            }
-        }
-        // sort
-        if (s1 < s2) {
-            if (s3 < s1) std::swap(s1,s3);
-        } else {
-            if (s2 < s3) std::swap(s1,s2);
-            else std::swap(s1,s3);
-        }
-        if(s3<s2) std::swap(s2,s3);
-        w << s1, s2, s3;
-        return w;
-    }
     
     void polarDiag(const Matrix3d& m, Matrix3d& U, Vector3d& s, Matrix3d& R)
     /** Polar decomposition m = U diag(s) U^T R by diagonalisation
@@ -643,7 +534,7 @@ namespace AffineLib{
         R = expSym(-logS, -lambda/2.0) * m;
     }
     
-    int polarHigham(const Matrix3d A, Matrix3d& S, Matrix3d& R){
+    int polarHigham(const Matrix3d& A, Matrix3d& S, Matrix3d& R){
         /** Polar decomposition m = S R   by iteration by Higham
          * @param m matrix to be decomposed
          * @param S shear part
@@ -655,7 +546,7 @@ namespace AffineLib{
         int iter=0;
         do {
             assert(Curr.determinant() != 0.0);
-            MatrixXd Ad = Curr.inverse().transpose();
+            Matrix3d Ad = Curr.inverse().transpose();
             double nad = Ad.array().abs().colwise().sum().maxCoeff() * Ad.array().abs().rowwise().sum().maxCoeff();
             double na = Curr.array().abs().colwise().sum().maxCoeff() * Curr.array().abs().rowwise().sum().maxCoeff();
             double gamma = sqrt(sqrt(nad / na));
@@ -717,9 +608,8 @@ namespace AffineLib{
         return X;
     }
     
-    // blend quaternion linearly
     Vector4d blendQuat(const std::vector<Vector4d>& A, const std::vector<double>& weight){
-        /** blend 4-vector; if weight doesn't sum up to one, the result will be complimented by 1
+        /** blend 4-vector (quaternion); if weight doesn't sum up to one, the result will be complimented by 1
          * this is suitable for linear blending of quaternions
          * @param A list of 4-vectors
          * @param weight list of weights
