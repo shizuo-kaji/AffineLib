@@ -35,7 +35,7 @@
 /// threshold for small values to be regarded zero
 #define EPSILON 10e-15
 // for assert()
-#define TOLERANCE 10e-6
+#define TOLERANCE 10e-3
 
 /// 3x3 identity matrix
 #define Id3 Matrix3d::Identity()
@@ -302,9 +302,6 @@ namespace AffineLib{
      */
     {
         assert( ((m - m.transpose())).squaredNorm() < TOLERANCE );
-        if(m.squaredNorm() < EPSILON){
-            return Id3+m+0.5*m*m;
-        }
         if(e == Vector3d::Zero()){
             // compute eigenvalues if not given
             // eigenvalues are sorted in increasing order.
@@ -334,27 +331,25 @@ namespace AffineLib{
      */
     {
         assert( ((m - m.transpose())).squaredNorm() < TOLERANCE );
-        if ((m-Id3).squaredNorm() < EPSILON){
-            return m-Id3-0.5*(m-Id3)*(m-Id3);
-        }
         // compute eigenvalues only
-        // eigenvalues are sorted in increasing order.
+        // eigenvalues are sorted in the increasing order.
         SelfAdjointEigenSolver<Matrix3d> eigensolver;
         eigensolver.computeDirect(m, EigenvaluesOnly);
-        Vector3d e;
-        e = eigensolver.eigenvalues();
+        Vector3d e(eigensolver.eigenvalues());
         assert(e[0] > 0 && e[1] > 0 && e[2] > 0);
-        Matrix3d A = m/e[1];
-        if ((A-Id3).squaredNorm() < EPSILON){
-            return log(e[1])*Id3 + (A-Id3-0.5*(A-Id3)*(A-Id3));
-        }
         lambda = e.array().log();
         double x(e[0]/e[1]),y(e[2]/e[1]);
-        double t2lx = abs(x-1)>EPSILON ? (log(x)-x+1)/(x-1) : -(x-1)/2-(x-1)+(x-1)/3;
-        double t2ly = abs(y-1)>EPSILON ? (log(y)-y+1)/(y-1) : -(y-1)/2-(y-1)+(y-1)/3;
-        double a = -1 + (y*t2lx - x*t2ly)/(x-y);
-        double c = (t2lx - t2ly)/(x-y);
-        return (a+log(e[1]))*Id3 - (a+c)*A + c*A*A;
+        double t2lx = abs(x-1)>EPSILON ? (log(x)-x+1)/(x-1) : -(x-1)/2+(x-1)*(x-1)/3;
+        double t2ly = abs(y-1)>EPSILON ? (log(y)-y+1)/(y-1) : -(y-1)/2+(y-1)*(y-1)/3;
+        double a,c;
+        if(abs(x-y)>EPSILON){
+            a = -1 + (y*t2lx - x*t2ly)/(x-y);
+            c = (t2lx - t2ly)/(x-y);
+        }else{
+            a = -1/6 + x*y/3;
+            c = -0.5 + (x+y)/3;
+        }
+        return (a+log(e[1]))*Id3 - (a+c)/e[1]*m + c/(e[1]*e[1])*m*m;
     }
     
     
