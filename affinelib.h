@@ -35,7 +35,7 @@
 /// threshold for small values to be regarded zero
 #define EPSILON 10e-15
 // for assert()
-#define TOLERANCE 10e-3
+#define TOLERANCE 10e-5
 
 /// 3x3 identity matrix
 #define Id3 Matrix3d::Identity()
@@ -308,6 +308,10 @@ namespace AffineLib{
             SelfAdjointEigenSolver<Matrix3d> eigensolver;
             eigensolver.computeDirect(m, EigenvaluesOnly);
             e = eigensolver.eigenvalues();
+            if(abs(e[0])<TOLERANCE){
+                eigensolver.compute(m, EigenvaluesOnly);
+                e = eigensolver.eigenvalues();
+            }
         }
         Matrix3d A = m-e[1]*Id3;
         if (A.squaredNorm() < EPSILON){
@@ -319,7 +323,8 @@ namespace AffineLib{
         
         double b = 1- x*y*(t2ex-t2ey)/(x-y);
         double c = (x*t2ex- y*t2ey)/(x-y);
-        return exp(e[1])*( Id3 + b*A + c*A*A );
+        Matrix3d ans(exp(e[1])*( Id3 + b*A + c*A*A));
+        return (ans+ans.transpose())/2;
     }
     
     
@@ -336,6 +341,10 @@ namespace AffineLib{
         SelfAdjointEigenSolver<Matrix3d> eigensolver;
         eigensolver.computeDirect(m, EigenvaluesOnly);
         Vector3d e(eigensolver.eigenvalues());
+        if(abs(e[0])<TOLERANCE){
+            eigensolver.compute(m, EigenvaluesOnly);
+            e = eigensolver.eigenvalues();
+        }
         assert(e[0] > 0 && e[1] > 0 && e[2] > 0);
         lambda = e.array().log();
         double x(e[0]/e[1]),y(e[2]/e[1]);
@@ -349,7 +358,8 @@ namespace AffineLib{
             a = -1/6 + x*y/3;
             c = -0.5 + (x+y)/3;
         }
-        return (a+log(e[1]))*Id3 - (a+c)/e[1]*m + c/(e[1]*e[1])*m*m;
+        Matrix3d ans((a+log(e[1]))*Id3 - (a+c)/e[1]*m + c/(e[1]*e[1])*m*m);
+        return (ans+ans.transpose())/2;
     }
     
     
@@ -370,12 +380,38 @@ namespace AffineLib{
             for(int j=0;j<m.size();j++){
                 W += w[j] * logSO(ZI * m[j]);
             }
+            W = (W-W.transpose())/2;
             if(W.squaredNorm()<EPSILON) break;
             Z = Z * expSO(W);
         }
         return(Z);
     }
     
+    
+    Matrix3d frechetSym(const std::vector<Matrix3d> &m, const std::vector<double> &w, const int max_step=10)
+    /** the Frechet mean for symmetric matrices
+     * @param m array of positive definite symmetric matrices to be averaged
+     * @param w array of weights
+     * @param max_step max steps for iteration
+     * @return weighted Frechet mean
+     */
+    {
+        assert(m.size() == w.size());
+        if(m.empty()) return(Id3);
+        Vector3d e;
+        Matrix3d Z = m[0];
+        for(int i=0;i<max_step;i++){
+            Matrix3d W = Matrix3d::Zero();
+            Matrix3d ZI = Z.inverse();
+            for(int j=0;j<m.size();j++){
+                W += w[j] * logSym(ZI * m[j], e);
+            }
+            W = (W+W.transpose())/2;
+            if(W.squaredNorm()<EPSILON) break;
+            Z = Z * expSO(W);
+        }
+        return(Z);
+    }
     
     void polarDiag(const Matrix3d& m, Matrix3d& U, Vector3d& s, Matrix3d& R)
     /** Polar decomposition m = U diag(s) U^T R by diagonalisation
